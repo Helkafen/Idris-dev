@@ -121,10 +121,10 @@ cleanPkg fp
           dir <- getCurrentDirectory
           setCurrentDirectory $ dir </> sourcedir pkgdesc
           clean (makefile pkgdesc)
-          mapM_ rmIBC (modules pkgdesc)
+          mapM_ (rmFileIfExists . toIBCFile) (modules pkgdesc)
           case execout pkgdesc of
                Nothing -> return ()
-               Just s -> rmFile $ dir </> s
+               Just s -> rmFileIfExists $ dir </> s
 
 -- | Generate IdrisDoc for package
 -- TODO: Handle case where module does not contain a matching namespace
@@ -230,8 +230,10 @@ testLib warn p f
                                return False
                        else fail $ "Missing library " ++ f
 
-rmIBC :: Name -> IO ()
-rmIBC m = rmFile $ toIBCFile m
+rmFileIfExists :: FilePath -> IO ()
+rmFileIfExists f = do
+    b <- doesFileExist f
+    when b (rmFile f)
 
 toIBCFile (UN n) = str n ++ ".ibc"
 toIBCFile (NS n ns) = foldl1' (</>) (reverse (toIBCFile n : map str ns))
