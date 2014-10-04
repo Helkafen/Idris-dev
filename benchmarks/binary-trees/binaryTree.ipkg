@@ -1,0 +1,6 @@
+package binaryTree
+
+modules = binaryTree
+
+executable = binaryTree
+main = binaryTree
