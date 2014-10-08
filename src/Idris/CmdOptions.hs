@@ -106,7 +106,6 @@ parseFlags = many $
   <|> (PkgCheck <$> strOption (long "checkpkg" <> metavar "IPKG" <> help "Check package only"))
   <|> (PkgTest <$> strOption (long "testpkg" <> metavar "IPKG" <> help "Run tests for package"))
   -- Misc options
-  <|> (BCAsm <$> strOption (long "bytecode"))
   <|> flag' (OutputTy Raw) (short 'S' <> long "codegenonly" <> help "Do no further compilation of code generator output")
   <|> flag' (OutputTy Object) (short 'c' <> long "compileonly" <> help "Compile to object files rather than an executable")
   <|> flag' (OutputTy MavenProject) (long "mvn" <> help "Create a maven project (for Java codegen)")

@@ -25,6 +25,9 @@ import Idris.Primitives
 import Idris.Imports
 import Idris.Error
 import Idris.CmdOptions
+import IRTS.CodegenCommon (OutputType(..))
+
+import Idris.Output (iputStrLn, pshow)
 
 import IRTS.System ( getLibFlags, getIdrisLibDir, getIncFlags )
 
@@ -40,6 +43,54 @@ import Paths_idris
 main :: IO ()
 main = do opts <- runArgParser
           runMain (runIdris opts)
+
+-- idris compiler main
+idrisc :: [Opt] -> Idris ()
+idrisc opts = do
+       let verbose = Verbose `elem` opts
+       let importdirs = opt getImportDir opts
+       let inputs = opt getFile opts
+       let ibcsubdir = opt getIBCSubDir opts
+       let output = opt getOutput opts
+       let cgn = case opt getCodegen opts of
+                   [] -> Via "c"
+                   xs -> last xs
+       let outty = case opt getOutputTy opts of
+                     [] -> Executable
+                     xs -> last xs
+       let pkgdirs = opt getPkgDir opts
+       setVerbose verbose
+       setCodegen cgn
+       setOutputTy outty
+       setWidth InfinitelyWide
+       case ibcsubdir of
+         [] -> setIBCSubDir ""
+         (d:_) -> setIBCSubDir d
+       setImportDirs importdirs
+
+       mapM_ addPkgDir $ (if NoBasePkgs `elem` opts then [] else ["prelude", "base"]) ++ pkgdirs
+       elabPrims
+       when (not (NoBuiltins `elem` opts)) $ do x <- loadModule "Builtins"
+                                                addAutoImport "Builtins"
+                                                return ()
+       when (not (NoPrelude `elem` opts)) $ do x <- loadModule "Prelude"
+                                               addAutoImport "Prelude"
+                                               return ()
+
+       loadInputs inputs Nothing
+
+       ok <- noErrors
+       when ok $ case output of
+                    [] -> return ()
+                    (o:_) -> idrisCatch (process "" (Compile cgn o))
+                               (\e -> do ist <- getIState ; iputStrLn $ pshow ist e)
+
+  where
+    addPkgDir :: String -> Idris ()
+    addPkgDir p = do ddir <- runIO $ getDataDir
+                     addImportDir (ddir </> p)
+                     addIBC (IBCImportDir (ddir </> p))
+
 
 runIdris :: [Opt] -> Idris ()
 runIdris opts = do
@@ -68,12 +119,14 @@ runIdris opts = do
            [] -> return ()
            fs -> do runIO $ mapM_ testPkg fs
                     runIO $ exitWith ExitSuccess
-       case opt getPkg opts of
-           [] -> case opt getPkgREPL opts of
-                      [] -> idrisMain opts
-                      [f] -> replPkg f
-                      _ -> ifail "Too many packages"
-           fs -> runIO $ mapM_ (buildPkg (WarnOnly `elem` opts)) fs
+       if (opt getOutput opts == [])
+         then case opt getPkg opts of
+             [] -> case opt getPkgREPL opts of
+                        [] -> idrisMain opts
+                        [f] -> replPkg f
+                        _ -> ifail "Too many packages"
+             fs -> runIO $ mapM_ (buildPkg (WarnOnly `elem` opts)) fs
+         else idrisc opts
 
 showver :: IO b
 showver = do putStrLn $ "Idris version " ++ ver

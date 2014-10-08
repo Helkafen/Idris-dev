@@ -1434,10 +1434,8 @@ idrisMain opts =
        let idesl = Ideslave `elem` opts || IdeslaveSocket `elem` opts
        let runrepl = not (NoREPL `elem` opts)
        let verbose = runrepl || Verbose `elem` opts
-       let output = opt getOutput opts
        let ibcsubdir = opt getIBCSubDir opts
        let importdirs = opt getImportDir opts
-       let bcs = opt getBC opts
        let pkgdirs = opt getPkgDir opts
        let optimize = case opt getOptLevel opts of
                         [] -> 2
@@ -1445,9 +1443,6 @@ idrisMain opts =
        let outty = case opt getOutputTy opts of
                      [] -> Executable
                      xs -> last xs
-       let cgn = case opt getCodegen opts of
-                   [] -> Via "c"
-                   xs -> last xs
        script <- case opt getExecScript opts of
                    []     -> return Nothing
                    x:y:xs -> do iputStrLn "More than one interpreter expression found."
@@ -1467,12 +1462,7 @@ idrisMain opts =
        setCmdLine opts
        setOutputTy outty
        setNoBanner nobanner
-       setCodegen cgn
        mapM_ makeOption opts
-       -- if we have the --bytecode flag, drop into the bytecode assembler
-       case bcs of
-         [] -> return ()
-         xs -> return () -- runIO $ mapM_ bcAsm xs
        case ibcsubdir of
          [] -> setIBCSubDir ""
          (d:_) -> setIBCSubDir d
@@ -1508,12 +1498,6 @@ idrisMain opts =
        when (not idesl) $ loadInputs inputs Nothing
 
        runIO $ hSetBuffering stdout LineBuffering
-
-       ok <- noErrors
-       when ok $ case output of
-                    [] -> return ()
-                    (o:_) -> idrisCatch (process "" (Compile cgn o))
-                               (\e -> do ist <- getIState ; iputStrLn $ pshow ist e)
 
        case immediate of
          [] -> return ()
@@ -1621,10 +1605,6 @@ initScript = do script <- getInitScript
 getFile :: Opt -> Maybe String
 getFile (Filename str) = Just str
 getFile _ = Nothing
-
-getBC :: Opt -> Maybe String
-getBC (BCAsm str) = Just str
-getBC _ = Nothing
 
 getOutput :: Opt -> Maybe String
 getOutput (Output str) = Just str
